@@ -112,7 +112,7 @@
 
 */
 
-const char version [] = "2.1a";
+const char version [] = "2.1b";
 
 // the sensor communicates using SPI, so include the library:
 #include <SPI.h>
@@ -189,6 +189,7 @@ byte setMagnetSPI(byte dir) {
   
   // Start SPI for magnets
   digitalWrite(chipSelectMagnets, HIGH);
+  delayMicroseconds(16);  
   SPI.beginTransaction(SPISettings(SPI_speed, MSBFIRST, SPI_MODE0));
   
   // prepare command
@@ -198,10 +199,11 @@ byte setMagnetSPI(byte dir) {
     dir = dir & 03;
   oldval = SPI.transfer(dir);
   // Wartezeit sollte nicht notwendig sein
-  delayMicroseconds(8);            
+  delayMicroseconds(16);            
   
   // disable 
   digitalWrite(chipSelectMagnets, LOW);
+  delayMicroseconds(16);  
   SPI.endTransaction();
 
   // Rückgabe: vorheriger Status
@@ -219,22 +221,33 @@ byte setMagnetSPI(byte dir) {
   Setzt lastMagnetDir (bitte nur lesen)
 */
 void setMagnetOn(byte dir) {
+  Serial.print("Magnet: ");
+
   // Drehung um 180°
   if (abs(dir - lastMagnetDir) == 2) {
-    setMagnetSPI( (dir+1) % 4);
+    Serial.print("Auto-Turn ");
+    Serial.print(lastMagnetDir);
+    Serial.print(" ");
+    Serial.print(dir);
+    Serial.print(" ");
+    Serial.println((dir+1) % 4);
+    setMagnetSPI(  (dir+1) % 4);
     delay(MOUSE_PUSH);
     }
+
   bool samedir = (dir == lastMagnetDir);
   setMagnetSPI(dir);                   
   lastMagnetDir = dir;
-  
-  Serial.print("Magnet: ");
+
   if (samedir) {
     delay(MOUSE_NOTURN);
     Serial.print(" == ");
   } else {
     delay(MOUSE_TURN);
   }
+  Serial.print(" ");
+  Serial.print(dir);
+  Serial.print(": ");
   Serial.println(dirCode[dir]);
 }
 
@@ -593,8 +606,8 @@ void locateAndGo() {
   }
   Serial.print(rpos, OCT);
   Serial.println(" ok.");
-  beep();                   // signal: mouse detected
-  delay(500);
+  // beep();                   // signal: mouse detected
+  // delay(500);
 
   
   Serial.print(" Matrix: ");
@@ -787,8 +800,10 @@ void restartMouse() {
   locateAndGo();
   
   // Maus fangen
+  lastMagnetDir = MOTOR_DirWest;
   setMagnetOn(MOTOR_DirWest);
-  setMagnetOff();
+  delay(MOUSE_TURN);
+  // setMagnetOff();
     
   lockdir = MOTOR_DirInvalid;
   oldpos = getMotorPosition();
@@ -873,8 +888,8 @@ void findGoal() {
   if (bitIsSet(stat, MOTOR_StatusGoalBit)) { 
     Serial.println("++++++ Goal reached");
     beep();
-    delay(200);
-    beep();
+    // delay(200);
+    // beep();
     printMotorStatus();
     // Maus stehen lassen, Magnete abschalten und zurück in Feldmitte
     setMagnetOff();
@@ -1163,6 +1178,7 @@ void loop() {
 void setup() {
   // Serial I/O
   Serial.begin(115200);
+  Serial.println();
   Serial.println();
   Serial.print("SPI Master ");
   Serial.print(version);

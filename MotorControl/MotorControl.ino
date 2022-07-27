@@ -125,7 +125,7 @@
     nachdem ein (beliebiges) Zeichen empfangen wurde.
  */
  
-const char version [] = "2.1a";
+const char version [] = "2.1b";
 
 bool debug = false;
 
@@ -950,16 +950,20 @@ void loop() {
         byte cmd = spiCommand;
         // Der Interrupt muss das Ready-Bit gelöscht haben
         if (bitIsSet(spiStatus, MOTOR_StatusReadyBit)) {
-            Serial.print("*** SPI Command  ");
-            Serial.print(cmd, HEX);
-            Serial.print(" ready, status: ");
-            Serial.println(spiStatus, BIN);
-             bitClear(spiStatus, MOTOR_StatusReadyBit); 
+            if (debug) {
+              Serial.print("*** SPI Command  ");
+              Serial.print(cmd, HEX);
+              Serial.print(" ready, status: ");
+              Serial.println(spiStatus, BIN);
+            }
+            bitClear(spiStatus, MOTOR_StatusReadyBit); 
         }
         spiNewCommand = false;              // Puffer frei  
         doSPIcommand(cmd);   
-        Serial.print("Status after command do:");
-        Serial.println(spiStatus, BIN);  
+        if (debug) {
+          Serial.print("Status after command do:");
+          Serial.println(spiStatus, BIN);  
+        }
         return;
     }
     
@@ -982,16 +986,17 @@ void loop() {
     /* Grundsätzlich sollte ein Kommando abgeschlossen sein
        sobald die Motoren im Stillstand sind.
        Durch einen noch nicht geklärten Programmierfehler
-       wurde das Read-Bit vorzeitig gesezt;
+       wurde das Ready-Bit vorzeitig gesezt;
        die folgende Verzögerung ist daher eine provisorische
        Maßnahme.
     */
     if (!pulsesActive && !spiNewCommand) {
-        delay(100);
+        delay(10);
         // still inactive?
         if (!pulsesActive && !spiNewCommand)
             bitSet(spiStatus, MOTOR_StatusReadyBit);
         else
+          if (debug)
             Serial.println("Premature Motor inactive");
     } 
 
@@ -1163,7 +1168,7 @@ void setup() {
         delay(1);                   // nicht notwendig, Platzhalter
     Serial.print("Centering done at ");
     Serial.println(spiPosition, OCT);
-    debug = true;
+    debug = false;
     if (!debug)
     Serial.println("Send any character to start debug mode.");
 }

@@ -45,8 +45,10 @@ ISR (SPI_STC_vect)
     if (bitRead(SPSR, WCOL))    // write collision?
         spiErrflag = 1;         // yes
     spiGotval = SPDR;           // grab byte from SPI Data Register
-    SPDR = spiGotval;           // and return this value by next transfer 
-    spiFlag = 1;                // tell we got new byte    
+    if (!spiFlag) {
+      SPDR = spiGotval;           // and return this value by next transfer 
+      spiFlag = 1;                // tell we got new byte    
+    }
 }  // end of interrupt routine SPI_STC_vect
 
 /* Port numbers (in Arduino numbering) */
@@ -233,11 +235,28 @@ int getkey() {
 void loop() {
     // check if new SPI command arrived
     if (spiFlag == 1) {
-        spiFlag = 0;       // command accepted
+        
         Serial.print("SPI: ");
         Serial.print(spiGotval);
+        switch (spiGotval) {
+           case 0: 
+              Serial.println(" Off");
+              break;
+           case DirNorth:
+              Serial.println(" North");
+              break;
+           case DirSouth:
+              Serial.println(" South");
+              break;
+           case DirWest:
+              Serial.println(" West");
+              break;
+           case DirEast:
+              Serial.println(" East");
+              break;
+        }
         setbydir(spiGotval);
-        Serial.println(".");
+        spiFlag = 0;       // command accepted
         return;
     }
     
