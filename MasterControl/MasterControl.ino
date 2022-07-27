@@ -112,7 +112,7 @@
 
 */
 
-const char version [] = "2.1b";
+const char version [] = "2.1c";
 
 // the sensor communicates using SPI, so include the library:
 #include <SPI.h>
@@ -716,6 +716,7 @@ byte lockdir = MOTOR_DirInvalid;    // Gegenrichtung zu der Eingangsrichtung
 void backToCenter() {
     setMagnetOn(FLIP_MOUSE(lastMagnetDir));   
     moveMotor(MOTOR_CmdMove, lastMagnetDir, 0);  // keine Zaunberührung auswerten 
+    delay(200);
     Serial.println("Back to center.. ");
 }
 
