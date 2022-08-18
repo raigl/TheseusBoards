@@ -112,7 +112,7 @@
 
 */
 
-const char version [] = "2.1c";
+const char version [] = "2.1d";
 
 // the sensor communicates using SPI, so include the library:
 #include <SPI.h>
@@ -142,7 +142,7 @@ const int beeper = 3;
 
 void beep() {
     digitalWrite(beeper, HIGH),
-    delay(100);
+    delay(500);
     digitalWrite(beeper, LOW);
 }
 

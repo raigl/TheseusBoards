@@ -123,9 +123,11 @@
     Um Zeitproblemen mit den Diagnoseausgaben über die serielle
     Schnittstelle zu entgehen, werden diese nur ausgegeben,
     nachdem ein (beliebiges) Zeichen empfangen wurde.
+    
+    2.1c 2022-08 Zaun-Entprellen durch Speichern bis nächste Bewegung
  */
  
-const char version [] = "2.1b";
+const char version [] = "2.1c";
 
 bool debug = false;
 
@@ -603,6 +605,8 @@ void checkLimitSwitches() {
     }
 }
 #endif
+
+#if 0
 /*
  * Abfrage der Zaun- und Zielkontakte;
  * Ergebnis ist in den Status-Bits.
@@ -639,7 +643,28 @@ void checkFenceAndGoalSwitches() {
     bitClear(spiStatus, MOTOR_StatusGoalBit);
 
 }
+#else
+/*
+ * Abfrage der Zaun- und Zielkontakte;
+ * Ergebnis ist in den Status-Bits.
+ *
+ * Wird bei der nächsten Bewegung gelöscht.
+ */
+void checkFenceAndGoalSwitches() {
 
+    // Zaunkontakt?
+    if (digitalRead(touchFence) == HIGH) {            
+        bitSet(spiStatus, MOTOR_StatusFenceBit);
+    }
+
+    // Zielkontakt?
+    if (digitalRead(touchGoal) == HIGH) {
+        bitSet(spiStatus, MOTOR_StatusGoalBit);
+    }
+
+
+}
+#endif
 
 /*
     Abfrage der Feldmittenschalter:
@@ -900,6 +925,11 @@ void doSPIcommand(byte cmd) {
         timerState = timerStop;    
         return;
     }
+
+	// Ziel- oder Zaunerkennung zurücksetzen
+    bitClear(spiStatus, MOTOR_StatusFenceBit);
+    bitClear(spiStatus, MOTOR_StatusGoalBit);
+
 
     // Zug-Bewegung mit Ziel- oder Zaun-Halt
     if ( op == MOTOR_CmdDrag) {
