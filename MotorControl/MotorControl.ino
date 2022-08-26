@@ -128,7 +128,7 @@
     2.1d 2022-08-22 Langsamer Default, delay bei Anfang (wg. Start zu schnell)
  */
  
-const char version [] = "2.1d";
+const char version [] = "2.1e";
 
 bool debug = false;
 
@@ -236,8 +236,8 @@ byte m2Pins[] = {M2_pulse, M2_dir, M2_enable, M2_stopW, M2_stopE, M2_btn1, M2_bt
  * Vor dem Setzen des 'timerState' auf 'timerStart' ist 'pulsesCount'
  * auf die gewünschte maximale Fahrlänge (ohne Bremsweg) zu setzen;
  */
-#define periodMax 1333                // mind.750 Hz
-#define periodMin 300                  // max. 3333 Hz
+#define periodMax 1333                // mind
+#define periodMin 150                 // max.
 #define rampIncr 36                   // Increment der Stoprampe (µs)
 #define rampDecr 18                   // Decrement der Startrampe (µs)
 #define rampFactor 200                 // Faktor exponentieller Anstieg
@@ -247,7 +247,7 @@ enum timerStates { timerOff, timerStart, timerStop, timerOn};
 volatile byte timerState = timerOff; // Steuerung
 volatile bool pulsesActive = false;
 volatile unsigned pulseCount = 0;     // Pulszähler 
-unsigned minPeriod = 800;             // µs; Endwert fürs Beschleunigen
+unsigned minPeriod = 400;             // µs; Endwert fürs Beschleunigen
 unsigned maxPeriod = 4000;            // µs; Endwert fürs Bremsen
 unsigned actualPeriod = 2000;         // µs; Pulsdauer aktuell
 
@@ -720,7 +720,7 @@ void checkMidSwitches() {
     if (midNS == oldMidNS && midEW == oldMidEW)
         return;
     // Entprellung auch in der Position
-    if (millis() - debounce < MidDebounce)
+    if (millis() - debounce < MidDebounce && debounce != 0)
       return;
 
     
@@ -808,7 +808,7 @@ void toCenter() {
         leaveDir = MOTOR_DirEast;
     if (digitalRead(M2_stopE) == LOW) 
         leaveDir = MOTOR_DirWest;
-   
+
     if (leaveDir != MOTOR_DirInvalid) {
         // Endschalter (noch) aktiv, anhalten wenn falsche Richtung
         if (leaveDir != lastMotorDir) {
@@ -819,6 +819,7 @@ void toCenter() {
         } 
         
         // wenn hier die Bewegung aktiv ist, dann in richtiger Richtung
+        Serial.println(pulsesActive);
         if (pulsesActive)
             return;                     // abwarten und Mittenschalte auswerten
         
@@ -1179,6 +1180,7 @@ void setup() {
     bitClear(SPCR, MSTR); 
     bitSet(SPCR, SPE);
     SPI.attachInterrupt();
+    
 
     /* Motor-Ansteuerung aktivieren
     */  
@@ -1187,10 +1189,8 @@ void setup() {
     digitalWrite(M2_enable, HIGH);
  
     debug = true; 
-    // Geschwindigkeiten holen
-    getSpeed();
-    delay(800);
-    getSpeed();
+    
+
 
    // Pulgeber aufsetzen
     initPulses();
@@ -1198,6 +1198,7 @@ void setup() {
 
     /* Feldmitte sicherstellen 
     */
+    checkMidSwitches(); 
     Serial.print("Centering start at ");
     Serial.println(spiPosition, OCT);
     do {
@@ -1205,6 +1206,7 @@ void setup() {
         // durch Taste abbrechen
         if (getKey() != 0)
             break;
+;
     } while (bitIsClear(spiStatus, MOTOR_StatusMidBit));
     // Auf Bewegungsende warten
     while (pulsesActive)
@@ -1213,6 +1215,10 @@ void setup() {
     Serial.println(spiPosition, OCT);
 
     
+    // Geschwindigkeiten holen
+    getSpeed();
+    delay(800);
+    getSpeed();
     debug = false;
     if (!debug)
     Serial.println("Send any character to start debug mode.");
