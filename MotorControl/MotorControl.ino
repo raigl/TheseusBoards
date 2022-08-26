@@ -125,9 +125,10 @@
     nachdem ein (beliebiges) Zeichen empfangen wurde.
     
     2.1c 2022-08 Zaun-Entprellen durch Speichern bis nächste Bewegung
+    2.1d 2022-08-22 Langsamer Default, delay bei Anfang (wg. Start zu schnell)
  */
  
-const char version [] = "2.1c";
+const char version [] = "2.1e";
 
 bool debug = false;
 
@@ -235,18 +236,18 @@ byte m2Pins[] = {M2_pulse, M2_dir, M2_enable, M2_stopW, M2_stopE, M2_btn1, M2_bt
  * Vor dem Setzen des 'timerState' auf 'timerStart' ist 'pulsesCount'
  * auf die gewünschte maximale Fahrlänge (ohne Bremsweg) zu setzen;
  */
-#define periodMax 1333                // mind.750 Hz
-#define periodMin 300                 // max. 3333 Hz
+#define periodMax 1333                // mind
+#define periodMin 150                 // max.
 #define rampIncr 36                   // Increment der Stoprampe (µs)
 #define rampDecr 18                   // Decrement der Startrampe (µs)
-#define rampFactor 87                 // Faktor exponentieller Anstieg
-#define RAMP_EXP 0                    // Exponentielle statt linearer Rampe   
+#define rampFactor 200                 // Faktor exponentieller Anstieg
+#define RAMP_EXP 1                    // Exponentielle statt linearer Rampe   
 // Flags, um die Impulse zu steuern
 enum timerStates { timerOff, timerStart, timerStop, timerOn};
 volatile byte timerState = timerOff; // Steuerung
 volatile bool pulsesActive = false;
 volatile unsigned pulseCount = 0;     // Pulszähler 
-unsigned minPeriod = 200;             // µs; Endwert fürs Beschleunigen
+unsigned minPeriod = 400;             // µs; Endwert fürs Beschleunigen
 unsigned maxPeriod = 4000;            // µs; Endwert fürs Bremsen
 unsigned actualPeriod = 2000;         // µs; Pulsdauer aktuell
 
@@ -271,7 +272,7 @@ ISR(TIMER1_COMPA_vect) {
     // Beschleunigung ?
     if (timerState == timerStart) {
 #if RAMP_EXP
-        actualPeriod -= actualPeriod/100; 
+        actualPeriod -= actualPeriod/rampFactor; 
 #else
         actualPeriod -= rampDecr;  
 #endif
@@ -373,7 +374,7 @@ void initPulses() {
     TIMSK1 = 0;                         // stop timer, no need to disable interrupts globally
     TCCR1A = 0;                         // normal operation
     TCCR1B = bit(WGM12) | bit(CS11);    // CTC, pre-scaling 8
-    OCR1A =  maxPeriod;                 // compare A register value
+    OCR1A =  TICKS * maxPeriod;         // compare A register value
     TIMSK1 = bit (OCIE1A);              // start hardwar timer in "interrupt on Compare A Match" mode
 }
 
@@ -486,6 +487,14 @@ void runMotor(byte mot[], int mdir) {
     delay(10);
     digitalWrite(mot[MotDir], mdir);
     delay(10);
+
+    // vermeide verirrte Werte
+    if (actualPeriod > maxPeriod)
+      actualPeriod = maxPeriod;
+    if (actualPeriod < minPeriod)
+      actualPeriod = minPeriod;
+    
+
     // starten
     timerState = timerStart;
     // Warte auf Start der Motoren, um vorzeitiges Ready zu vermeiden
@@ -711,7 +720,7 @@ void checkMidSwitches() {
     if (midNS == oldMidNS && midEW == oldMidEW)
         return;
     // Entprellung auch in der Position
-    if (millis() - debounce < MidDebounce)
+    if (millis() - debounce < MidDebounce && debounce != 0)
       return;
 
     
@@ -799,7 +808,7 @@ void toCenter() {
         leaveDir = MOTOR_DirEast;
     if (digitalRead(M2_stopE) == LOW) 
         leaveDir = MOTOR_DirWest;
-   
+
     if (leaveDir != MOTOR_DirInvalid) {
         // Endschalter (noch) aktiv, anhalten wenn falsche Richtung
         if (leaveDir != lastMotorDir) {
@@ -810,6 +819,7 @@ void toCenter() {
         } 
         
         // wenn hier die Bewegung aktiv ist, dann in richtiger Richtung
+        Serial.println(pulsesActive);
         if (pulsesActive)
             return;                     // abwarten und Mittenschalte auswerten
         
@@ -1166,25 +1176,29 @@ void setup() {
     pinMode(MISO, OUTPUT);
     pinMode(SS, INPUT);
 
-    // Enable SPI in slave mode and enable interrupts
+   // Enable SPI in slave mode and enable interrupts
     bitClear(SPCR, MSTR); 
     bitSet(SPCR, SPE);
     SPI.attachInterrupt();
+    
 
     /* Motor-Ansteuerung aktivieren
     */  
     // vor dem Einrichten des Impulsgebers Motoren abschalten
     digitalWrite(M1_enable, HIGH);
     digitalWrite(M2_enable, HIGH);
-    // Pulgeber aufsetzen
+ 
+    debug = true; 
+    
+
+
+   // Pulgeber aufsetzen
     initPulses();
 
-    debug = true; 
-    // Geschwindigkeiten holen
-    getSpeed();
 
     /* Feldmitte sicherstellen 
     */
+    checkMidSwitches(); 
     Serial.print("Centering start at ");
     Serial.println(spiPosition, OCT);
     do {
@@ -1192,12 +1206,19 @@ void setup() {
         // durch Taste abbrechen
         if (getKey() != 0)
             break;
+;
     } while (bitIsClear(spiStatus, MOTOR_StatusMidBit));
     // Auf Bewegungsende warten
     while (pulsesActive)
         delay(1);                   // nicht notwendig, Platzhalter
     Serial.print("Centering done at ");
     Serial.println(spiPosition, OCT);
+
+    
+    // Geschwindigkeiten holen
+    getSpeed();
+    delay(800);
+    getSpeed();
     debug = false;
     if (!debug)
     Serial.println("Send any character to start debug mode.");
